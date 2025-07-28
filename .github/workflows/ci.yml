@@ -17,21 +17,6 @@ jobs:
       with:
         go-version: '1.23'
     
-    - name: Restore Go modules cache
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-1.23-
-    
-    - name: Clean Go toolchain cache conflicts
-      run: |
-        # Remove any conflicting toolchain files from cache
-        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
-      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy
@@ -42,14 +27,6 @@ jobs:
     - name: Test build
       run: make build
     
-    - name: Save Go modules cache
-      uses: actions/cache/save@v4
-      if: always()
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
 
   build-and-prerelease:
     needs: test
@@ -66,21 +43,6 @@ jobs:
       with:
         go-version: '1.23'
     
-    - name: Restore Go modules cache
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-1.23-
-    
-    - name: Clean Go toolchain cache conflicts
-      run: |
-        # Remove any conflicting toolchain files from cache
-        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
-      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy
@@ -216,7 +178,6 @@ jobs:
           --title "Development Build (${{ steps.version.outputs.version }})" \
           --notes-file release-notes.md \
           --prerelease \
-          --generate-notes false \
           build/OhMySSH-* \
           build/checksums.txt
     
