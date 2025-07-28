@@ -1,6 +1,8 @@
 module github.com/polinux/ohmyssh
 
-go 1.24.5
+go 1.23.0
+
+toolchain go1.24.5
 
 require (
 	github.com/charmbracelet/bubbles v0.21.0
