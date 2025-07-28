@@ -1,0 +1,25 @@
+# Sample SSH Configuration for testing OhMySSH
+
+Host development-server
+    HostName dev.example.com
+    Port 22
+    User developer
+    IdentityFile ~/.ssh/id_rsa
+
+Host production-server
+    HostName prod.example.com
+    Port 2222
+    User admin
+    IdentityFile ~/.ssh/id_rsa_prod
+    
+Host local-vm
+    HostName 192.168.1.100
+    Port 22
+    User root
+    ForwardAgent yes
+
+Host bastion
+    HostName bastion.company.com
+    Port 22
+    User ops
+    ProxyJump gateway

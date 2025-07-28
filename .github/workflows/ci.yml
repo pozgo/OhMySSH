@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    
+    # No caching used to avoid tar extraction conflicts
+    - name: Download Go dependencies
+      run: go mod tidy
+    
+    - name: Run tests
+      run: make test
+    
+    - name: Test build
+      run: make build
+    
+
+  build-and-prerelease:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    
+    # No caching used to avoid tar extraction conflicts
+    - name: Download Go dependencies
+      run: go mod tidy
+    
+    - name: Generate version and metadata
+      id: version
+      run: |
+        COMMIT_SHORT=$(git rev-parse --short HEAD)
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        VERSION="dev-${COMMIT_SHORT}-${TIMESTAMP}"
+        COMMIT_SHA=$(git rev-parse HEAD)
+        BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+        echo "tag_name=dev-${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+        
+        echo "Generated version: $VERSION"
+        echo "Commit SHA: $COMMIT_SHA"
+        echo "Build date: $BUILD_DATE"
+        echo "Tag name: dev-${COMMIT_SHORT}"
+    
+    - name: Make build script executable
+      run: chmod +x build.sh
+    
+    - name: Build all platforms
+      run: |
+        mkdir -p build
+        ./build.sh "${{ steps.version.outputs.version }}"
+    
+    - name: Create checksums
+      run: |
+        cd build
+        sha256sum OhMySSH-* > checksums.txt
+        cat checksums.txt
+    
+    - name: Generate development changelog
+      id: changelog
+      run: |
+        # Get the previous dev release tag for comparison
+        PREVIOUS_TAG=$(git tag -l "dev-*" --sort=-version:refname | head -n 1 2>/dev/null || echo "")
+        
+        echo "## 🚧 Development Changes" > dev-changelog.md
+        echo "" >> dev-changelog.md
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "**Changes since previous dev build ($PREVIOUS_TAG):**" >> dev-changelog.md
+          echo "" >> dev-changelog.md
+          
+          # Get commits since last dev tag, excluding infrastructure changes
+          COMMITS=$(git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..HEAD \
+            --grep="^ci:" --grep="^build:" --grep="^docs:" --grep="github actions" \
+            --grep="workflow" --grep="makefile" --grep="dockerfile" --grep="\.yml" \
+            --grep="\.yaml" --grep="\.md" --invert-grep -i 2>/dev/null || \
+            git log --pretty=format:"- %s (%an)" --max-count=10 \
+            --grep="^ci:" --grep="^build:" --grep="^docs:" --grep="github actions" \
+            --grep="workflow" --grep="makefile" --grep="dockerfile" --grep="\.yml" \
+            --grep="\.yaml" --grep="\.md" --invert-grep -i)
+          if [ -n "$COMMITS" ]; then
+            echo "$COMMITS" >> dev-changelog.md
+          else
+            echo "- No application code changes since last dev build" >> dev-changelog.md
+          fi
+        else
+          echo "**Recent code commits:**" >> dev-changelog.md
+          echo "" >> dev-changelog.md
+          git log --pretty=format:"- %s (%an)" --max-count=10 \
+            --grep="^ci:" --grep="^build:" --grep="^docs:" --grep="github actions" \
+            --grep="workflow" --grep="makefile" --grep="dockerfile" --grep="\.yml" \
+            --grep="\.yaml" --grep="\.md" --invert-grep -i >> dev-changelog.md
+        fi
+        
+        echo "" >> dev-changelog.md
+        echo "## 📦 Assets" >> dev-changelog.md
+        echo "" >> dev-changelog.md
+        echo "**Checksums:**" >> dev-changelog.md
+        echo "\`\`\`" >> dev-changelog.md
+        cat build/checksums.txt >> dev-changelog.md
+        echo "\`\`\`" >> dev-changelog.md
+        
+        echo "Generated development changelog:"
+        cat dev-changelog.md
+    
+    - name: Create pre-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create comprehensive release notes
+        cat > release-notes.md << 'EOF'
+        **⚠️ Development Build - Not for Production Use**
+        
+        This is an automated development build from the latest commit on the `dev` branch.
+        
+        **Build Information:**
+        - **Version:** ${{ steps.version.outputs.version }}
+        - **Commit:** ${{ steps.version.outputs.commit_sha }}
+        - **Date:** ${{ steps.version.outputs.build_date }}
+        
+        **Download:**
+        Choose the appropriate binary for your platform:
+        - **Linux AMD64:** `OhMySSH-linux-amd64`
+        - **Linux ARM64:** `OhMySSH-linux-arm64`
+        - **macOS Intel:** `OhMySSH-darwin-amd64`
+        - **macOS Apple Silicon:** `OhMySSH-darwin-arm64`
+        - **Windows AMD64:** `OhMySSH-windows-amd64.exe`
+        - **Windows ARM64:** `OhMySSH-windows-arm64.exe`
+        
+        **Installation:**
+        ```bash
+        # Download for your platform (example for Linux AMD64)
+        curl -L https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.tag_name }}/OhMySSH-linux-amd64 -o OhMySSH
+        chmod +x OhMySSH
+        ./OhMySSH
+        ```
+        
+        ---
+        
+        EOF
+        
+        # Append the changelog
+        cat dev-changelog.md >> release-notes.md
+        
+        gh release create "${{ steps.version.outputs.tag_name }}" \
+          --title "Development Build (${{ steps.version.outputs.version }})" \
+          --notes-file release-notes.md \
+          --prerelease \
+          build/OhMySSH-* \
+          build/checksums.txt

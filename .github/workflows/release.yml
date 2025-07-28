@@ -1,0 +1,213 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    
+    
+    - name: Download dependencies
+      run: go mod tidy
+    
+    - name: Run tests
+      run: make test
+    
+    - name: Test build
+      run: make build
+    
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+    
+    
+    - name: Download dependencies
+      run: go mod tidy
+    
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Make build script executable
+      run: chmod +x build.sh
+    
+    - name: Build all platforms
+      run: |
+        mkdir -p build
+        ./build.sh "${{ steps.version.outputs.version }}"
+    
+    - name: Create checksums
+      run: |
+        cd build
+        sha256sum OhMySSH-* > checksums.txt
+        cat checksums.txt
+    
+    - name: Generate production changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        echo "# 🚀 OhMySSH ${{ steps.version.outputs.version }}" > changelog.md
+        echo "" >> changelog.md
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "## 📋 Changes since $PREVIOUS_TAG" >> changelog.md
+          echo "" >> changelog.md
+          
+          # Categorize commits, excluding infrastructure changes
+          INFRASTRUCTURE_FILTER="--grep=^ci: --grep=^build: --grep=^docs: --grep=github.actions --grep=workflow --grep=makefile --grep=dockerfile --grep=\.yml --grep=\.yaml --grep=\.md --grep=README --grep=LICENSE --grep=gitignore --invert-grep -i"
+          
+          FEAT_COMMITS=$(git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..HEAD --grep="feat" --grep="feature" -i $INFRASTRUCTURE_FILTER 2>/dev/null || echo "")
+          FIX_COMMITS=$(git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..HEAD --grep="fix" --grep="bug" -i $INFRASTRUCTURE_FILTER 2>/dev/null || echo "")
+          OTHER_COMMITS=$(git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..HEAD --invert-grep --grep="feat\|feature\|fix\|bug" -i $INFRASTRUCTURE_FILTER 2>/dev/null || echo "")
+          
+          if [ -n "$FEAT_COMMITS" ]; then
+            echo "### ✨ New Features" >> changelog.md
+            echo "$FEAT_COMMITS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          if [ -n "$FIX_COMMITS" ]; then
+            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "$FIX_COMMITS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          if [ -n "$OTHER_COMMITS" ]; then
+            echo "### 🔧 Other Changes" >> changelog.md
+            echo "$OTHER_COMMITS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+          
+          # If no categorized commits, show all code-related changes
+          if [ -z "$FEAT_COMMITS" ] && [ -z "$FIX_COMMITS" ] && [ -z "$OTHER_COMMITS" ]; then
+            echo "### 📝 Code Changes" >> changelog.md
+            git log --pretty=format:"- %s (%an)" $PREVIOUS_TAG..HEAD $INFRASTRUCTURE_FILTER >> changelog.md
+            echo "" >> changelog.md
+          fi
+        else
+          echo "## 🎉 Initial Release" >> changelog.md
+          echo "" >> changelog.md
+          echo "This is the first official release of OhMySSH - a modern, interactive SSH connection manager with a beautiful terminal UI." >> changelog.md
+          echo "" >> changelog.md
+          echo "### ✨ Key Features" >> changelog.md
+          echo "- 🚀 **Interactive SSH Manager** - Beautiful TUI interface" >> changelog.md
+          echo "- 📝 **Vim-style Editor** - Modal editing with syntax highlighting" >> changelog.md
+          echo "- 🖱️ **Mouse Support** - Click to select and interact" >> changelog.md
+          echo "- 🔧 **Smart Parser** - Automatic SSH config detection" >> changelog.md
+          echo "- 🛡️ **Safe Editing** - Automatic backups & validation" >> changelog.md
+          echo "- 🌐 **Cross-platform** - Linux, macOS, Windows" >> changelog.md
+          echo "" >> changelog.md
+        fi
+        
+        echo "## 📦 Download" >> changelog.md
+        echo "" >> changelog.md
+        echo "Choose the appropriate binary for your platform:" >> changelog.md
+        echo "" >> changelog.md
+        echo "| Platform | Architecture | Download |" >> changelog.md
+        echo "|----------|--------------|----------|" >> changelog.md
+        echo "| Linux | AMD64 | [\`OhMySSH-linux-amd64\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-linux-amd64) |" >> changelog.md
+        echo "| Linux | ARM64 | [\`OhMySSH-linux-arm64\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-linux-arm64) |" >> changelog.md
+        echo "| macOS | Intel | [\`OhMySSH-darwin-amd64\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-darwin-amd64) |" >> changelog.md
+        echo "| macOS | Apple Silicon | [\`OhMySSH-darwin-arm64\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-darwin-arm64) |" >> changelog.md
+        echo "| Windows | AMD64 | [\`OhMySSH-windows-amd64.exe\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-windows-amd64.exe) |" >> changelog.md
+        echo "| Windows | ARM64 | [\`OhMySSH-windows-arm64.exe\`](https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-windows-arm64.exe) |" >> changelog.md
+        echo "" >> changelog.md
+        
+        echo "## 🔧 Installation" >> changelog.md
+        echo "" >> changelog.md
+        echo "\`\`\`bash" >> changelog.md
+        echo "# Linux/macOS - Download and make executable" >> changelog.md
+        echo "curl -L https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.version }}/OhMySSH-linux-amd64 -o OhMySSH" >> changelog.md
+        echo "chmod +x OhMySSH" >> changelog.md
+        echo "./OhMySSH" >> changelog.md
+        echo "" >> changelog.md
+        echo "# Or install to system path" >> changelog.md
+        echo "sudo mv OhMySSH /usr/local/bin/" >> changelog.md
+        echo "OhMySSH" >> changelog.md
+        echo "\`\`\`" >> changelog.md
+        echo "" >> changelog.md
+        
+        echo "## 🔐 Checksums" >> changelog.md
+        echo "" >> changelog.md
+        echo "Verify your download with SHA256 checksums:" >> changelog.md
+        echo "" >> changelog.md
+        echo "\`\`\`" >> changelog.md
+        cat build/checksums.txt >> changelog.md
+        echo "\`\`\`" >> changelog.md
+        echo "" >> changelog.md
+        
+        echo "## 🙏 Acknowledgments" >> changelog.md
+        echo "" >> changelog.md
+        echo "Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) • Inspired by [lazygit](https://github.com/jesseduffield/lazygit)" >> changelog.md
+        
+        echo "Generated production changelog:"
+        cat changelog.md
+    
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create ${{ steps.version.outputs.version }} \
+          --title "OhMySSH ${{ steps.version.outputs.version }}" \
+          --notes-file changelog.md \
+          build/OhMySSH-* \
+          build/checksums.txt
+    
+
+  # Update main branch after successful release (if triggered by tag)
+  update-main:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Update main branch
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Checkout main and merge the tag
+        git checkout main
+        git merge ${{ github.ref_name }} --no-ff -m "Release ${{ github.ref_name }}"
+        git push origin main
