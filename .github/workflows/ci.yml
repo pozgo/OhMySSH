@@ -180,12 +180,3 @@ jobs:
           --prerelease \
           build/OhMySSH-* \
           build/checksums.txt
-    
-    - name: Save Go modules cache
-      uses: actions/cache/save@v4
-      if: always()
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
