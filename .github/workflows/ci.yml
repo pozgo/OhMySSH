@@ -17,8 +17,8 @@ jobs:
       with:
         go-version: '1.23'
     
-    
-    - name: Download dependencies
+    # No caching used to avoid tar extraction conflicts
+    - name: Download Go dependencies
       run: go mod tidy
     
     - name: Run tests
@@ -43,8 +43,8 @@ jobs:
       with:
         go-version: '1.23'
     
-    
-    - name: Download dependencies
+    # No caching used to avoid tar extraction conflicts
+    - name: Download Go dependencies
       run: go mod tidy
     
     - name: Generate version and metadata
@@ -126,14 +126,6 @@ jobs:
         
         echo "Generated development changelog:"
         cat dev-changelog.md
-    
-    - name: Delete existing pre-release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release delete "${{ steps.version.outputs.tag_name }}" --yes || echo "No existing release"
-        git push --delete origin "${{ steps.version.outputs.tag_name }}" || echo "No existing tag"
-      continue-on-error: true
     
     - name: Create pre-release
       env:
