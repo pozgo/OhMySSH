@@ -15,8 +15,8 @@ jobs:
       with:
         go-version: '1.23'
     
-    - name: Cache Go modules
-      uses: actions/cache@v4
+    - name: Restore Go modules cache
+      uses: actions/cache/restore@v4
       with:
         path: |
           ~/.cache/go-build
@@ -24,7 +24,6 @@ jobs:
         key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-1.23-
-        save-always: true
     
     - name: Clean Go toolchain cache conflicts
       run: |
@@ -47,3 +46,12 @@ jobs:
         name: build-artifacts
         path: build/
         retention-days: 7
+    
+    - name: Save Go modules cache
+      uses: actions/cache/save@v4
+      if: always()
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
