@@ -18,13 +18,14 @@ jobs:
         go-version: '1.23'
     
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-1.23-
           ${{ runner.os }}-go-
     
     - name: Download dependencies
@@ -52,13 +53,14 @@ jobs:
         go-version: '1.23'
     
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-1.23-
           ${{ runner.os }}-go-
     
     - name: Download dependencies
