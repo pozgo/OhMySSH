@@ -31,7 +31,13 @@ jobs:
         key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-1.23-
-          ${{ runner.os }}-go-
+        save-always: true
+    
+    - name: Clean Go toolchain cache conflicts
+      run: |
+        # Remove any conflicting toolchain files from cache
+        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
+      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy
@@ -65,7 +71,13 @@ jobs:
         key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-1.23-
-          ${{ runner.os }}-go-
+        save-always: true
+    
+    - name: Clean Go toolchain cache conflicts
+      run: |
+        # Remove any conflicting toolchain files from cache
+        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
+      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy

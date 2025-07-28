@@ -26,7 +26,13 @@ jobs:
         key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-1.23-
-          ${{ runner.os }}-go-
+        save-always: true
+    
+    - name: Clean Go toolchain cache conflicts
+      run: |
+        # Remove any conflicting toolchain files from cache
+        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
+      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy
@@ -61,17 +67,35 @@ jobs:
         key: ${{ runner.os }}-go-1.23-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-1.23-
-          ${{ runner.os }}-go-
+        save-always: true
+    
+    - name: Clean Go toolchain cache conflicts
+      run: |
+        # Remove any conflicting toolchain files from cache
+        find ~/go/pkg/mod -name "golang.org" -type d -exec rm -rf {} + 2>/dev/null || true
+      continue-on-error: true
     
     - name: Download dependencies
       run: go mod tidy
     
-    - name: Generate version
+    - name: Generate version and metadata
       id: version
       run: |
-        VERSION="dev-$(git rev-parse --short HEAD)-$(date +%Y%m%d%H%M%S)"
+        COMMIT_SHORT=$(git rev-parse --short HEAD)
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        VERSION="dev-${COMMIT_SHORT}-${TIMESTAMP}"
+        COMMIT_SHA=$(git rev-parse HEAD)
+        BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
         echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+        echo "tag_name=dev-${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+        
         echo "Generated version: $VERSION"
+        echo "Commit SHA: $COMMIT_SHA"
+        echo "Build date: $BUILD_DATE"
+        echo "Tag name: dev-${COMMIT_SHORT}"
     
     - name: Make build script executable
       run: chmod +x build.sh
@@ -91,27 +115,24 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release delete dev-latest --yes || echo "No existing dev-latest release"
-        git push --delete origin dev-latest || echo "No existing dev-latest tag"
+        gh release delete "${{ steps.version.outputs.tag_name }}" --yes || echo "No existing release"
+        git push --delete origin "${{ steps.version.outputs.tag_name }}" || echo "No existing tag"
       continue-on-error: true
     
     - name: Create pre-release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        COMMIT_SHA=$(git rev-parse HEAD)
-        BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        gh release create dev-latest \
-          --title "Development Build (Latest)" \
+        gh release create "${{ steps.version.outputs.tag_name }}" \
+          --title "Development Build (${{ steps.version.outputs.version }})" \
           --notes "**⚠️ Development Build - Not for Production Use**
         
         This is an automated development build from the latest commit on the \`dev\` branch.
         
         **Build Information:**
         - **Version:** ${{ steps.version.outputs.version }}
-        - **Commit:** $COMMIT_SHA
-        - **Date:** $BUILD_DATE
+        - **Commit:** ${{ steps.version.outputs.commit_sha }}
+        - **Date:** ${{ steps.version.outputs.build_date }}
         
         **Download:**
         Choose the appropriate binary for your platform:
@@ -125,7 +146,7 @@ jobs:
         **Installation:**
         \`\`\`bash
         # Download for your platform (example for Linux AMD64)
-        curl -L https://github.com/pozgo/OhMySSH/releases/download/dev-latest/OhMySSH-linux-amd64 -o OhMySSH
+        curl -L https://github.com/pozgo/OhMySSH/releases/download/${{ steps.version.outputs.tag_name }}/OhMySSH-linux-amd64 -o OhMySSH
         chmod +x OhMySSH
         ./OhMySSH
         \`\`\`" \
