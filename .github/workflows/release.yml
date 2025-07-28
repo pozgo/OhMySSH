@@ -181,6 +181,17 @@ jobs:
         echo "Generated production changelog:"
         cat changelog.md
     
+    - name: Delete existing release and tag if they exist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Delete existing release if it exists (ignore errors if it doesn't exist)
+        gh release delete ${{ steps.version.outputs.version }} --yes || true
+        
+        # Delete existing tag if it exists (ignore errors if it doesn't exist)  
+        git tag -d ${{ steps.version.outputs.version }} || true
+        git push origin --delete ${{ steps.version.outputs.version }} || true
+    
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
