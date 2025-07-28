@@ -42,6 +42,9 @@ func (c *SSHConfig) Load() error {
 	}
 	defer file.Close()
 
+	// Clear existing hosts to prevent duplicates
+	c.Hosts = make([]Host, 0)
+	
 	scanner := bufio.NewScanner(file)
 	var currentHost *Host
 
