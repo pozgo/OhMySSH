@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.19'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod tidy
+    
+    - name: Run tests
+      run: make test
+    
+    - name: Test build
+      run: make build
+
+  build-and-prerelease:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.19'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod tidy
+    
+    - name: Generate version
+      id: version
+      run: |
+        VERSION="dev-$(git rev-parse --short HEAD)-$(date +%Y%m%d%H%M%S)"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Generated version: $VERSION"
+    
+    - name: Build all platforms
+      run: |
+        mkdir -p build
+        VERSION="${{ steps.version.outputs.version }}" make build-all
+    
+    - name: Create checksums
+      run: |
+        cd build
+        sha256sum OhMySSH-* > checksums.txt
+        cat checksums.txt
+    
+    - name: Delete existing pre-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release delete dev-latest --yes || echo "No existing dev-latest release"
+        git push --delete origin dev-latest || echo "No existing dev-latest tag"
+      continue-on-error: true
+    
+    - name: Create pre-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create dev-latest \
+          --title "Development Build (Latest)" \
+          --notes "**⚠️ Development Build - Not for Production Use**
+        
+        This is an automated development build from the latest commit on the \`dev\` branch.
+        
+        **Build Information:**
+        - **Version:** ${{ steps.version.outputs.version }}
+        - **Commit:** $(git rev-parse HEAD)
+        - **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        **Download:**
+        Choose the appropriate binary for your platform:
+        - **Linux AMD64:** \`OhMySSH-linux-amd64\`
+        - **Linux ARM64:** \`OhMySSH-linux-arm64\`
+        - **macOS Intel:** \`OhMySSH-darwin-amd64\`
+        - **macOS Apple Silicon:** \`OhMySSH-darwin-arm64\`
+        - **Windows AMD64:** \`OhMySSH-windows-amd64.exe\`
+        - **Windows ARM64:** \`OhMySSH-windows-arm64.exe\`
+        
+        **Installation:**
+        \`\`\`bash
+        # Download for your platform (example for Linux AMD64)
+        curl -L https://github.com/pozgo/OhMySSH/releases/download/dev-latest/OhMySSH-linux-amd64 -o OhMySSH
+        chmod +x OhMySSH
+        ./OhMySSH
+        \`\`\`" \
+          --prerelease \
+          build/OhMySSH-* \
+          build/checksums.txt

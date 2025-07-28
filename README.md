@@ -688,8 +688,6 @@ This project is licensed under the **MIT License**
 
 ---
 
-<img src="https://raw.githubusercontent.com/pozgo/OhMySSH/main/assets/footer.png" alt="Footer" width="100%"/>
-
 **Made with ❤️ and lots of ☕ for developers everywhere**
 
 [![GitHub Stars](https://img.shields.io/github/stars/pozgo/OhMySSH?style=social)](https://github.com/pozgo/OhMySSH/stargazers)
