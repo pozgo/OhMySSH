@@ -81,10 +81,13 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
     
+    - name: Make build script executable
+      run: chmod +x build.sh
+    
     - name: Build all platforms
       run: |
         mkdir -p build
-        VERSION="${{ steps.version.outputs.version }}" make build-all
+        ./build.sh "${{ steps.version.outputs.version }}"
     
     - name: Create checksums
       run: |

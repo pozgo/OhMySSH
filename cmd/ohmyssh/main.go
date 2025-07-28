@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/polinux/ohmyssh/pkg/parser"
+	"github.com/pozgo/OhMySSH/pkg/parser"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"

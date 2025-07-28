@@ -73,10 +73,13 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Generated version: $VERSION"
     
+    - name: Make build script executable
+      run: chmod +x build.sh
+    
     - name: Build all platforms
       run: |
         mkdir -p build
-        VERSION="${{ steps.version.outputs.version }}" make build-all
+        ./build.sh "${{ steps.version.outputs.version }}"
     
     - name: Create checksums
       run: |
@@ -96,6 +99,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        COMMIT_SHA=$(git rev-parse HEAD)
+        BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
         gh release create dev-latest \
           --title "Development Build (Latest)" \
           --notes "**⚠️ Development Build - Not for Production Use**
@@ -104,8 +110,8 @@ jobs:
         
         **Build Information:**
         - **Version:** ${{ steps.version.outputs.version }}
-        - **Commit:** $(git rev-parse HEAD)
-        - **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - **Commit:** $COMMIT_SHA
+        - **Date:** $BUILD_DATE
         
         **Download:**
         Choose the appropriate binary for your platform:

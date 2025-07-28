@@ -1,4 +1,4 @@
-module github.com/polinux/ohmyssh
+module github.com/pozgo/OhMySSH
 
 go 1.23.0
 
