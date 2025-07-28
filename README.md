@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/pozgo/OhMySSH?style=for-the-badge)](https://github.com/pozgo/OhMySSH/releases)
 [![Go Version](https://img.shields.io/badge/go-%3E%3D1.19-00ADD8.svg?style=for-the-badge&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![Build Status](https://img.shields.io/github/workflow/status/pozgo/OhMySSH/CI?style=for-the-badge)](https://github.com/pozgo/OhMySSH/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/pozgo/OhMySSH/ci.yml?branch=dev&style=for-the-badge)](https://github.com/pozgo/OhMySSH/actions)
 
 **Built with Go • Inspired by lazygit • Powered by Bubble Tea**
 
@@ -53,20 +53,21 @@
 </div>
 
 ```text
+🌐 SSH SERVERS 🚀          📄 SSH CONFIG PREVIEW ⚙️
 ┌─────────────────────┬─────────────────────────────────┐
-│ 🖥️  SSH Servers     │                                 │
-│ ▶ 🌐 web-server     │        📄 SSH Config Preview    │
-│   🗄️ database-srv   │                                 │
-│   🔧 dev-server     │  Host web-server                │
-│   🚀 production     │      HostName example.com       │
-├─────────────────────┤      User admin                 │
-│ 📊 Server Details   │      Port 22                    │
-│ 🏠 Host: web-server │      IdentityFile ~/.ssh/key    │
-│ 🌍 IP: example.com  │                                 │
-│ 👤 User: admin      │  Host database-srv              │
-│ 🔌 Port: 22         │      HostName db.example.com    │
+│ 💻 web-server       │                                 │
+│ 🌐 database-srv     │  Host web-server                │
+│ 🌐 dev-server       │      HostName example.com       │
+│ 🌐 production       │      User admin                 │
+│                     │      Port 22                    │
+├─────────────────────┤      IdentityFile ~/.ssh/key    │
+│ 📋 SERVER DETAILS 🔍│                                 │
+│ Host: web-server    │  Host database-srv              │
+│ Hostname: example.com│     HostName db.example.com    │
+│ User: admin         │     User dbadmin                │
+│ Port: 22            │     Port 5432                   │
 └─────────────────────┴─────────────────────────────────┘
-  q: quit | ↑↓: navigate | ⏎: connect | e: edit | 🖱️: click
+  q: quit | ↑↓: navigate | ⏎: connect | e: edit | ESC/q: exit editor | 🖱️: click
 ```
 
 <div align="center">
@@ -354,11 +355,10 @@ Host k8s-master
 ```console
 🚀 Connecting to server via OhMySSH...
 ┌─────────────────────────────────────────┐
-│ 🖥️  Server: web-server                  │
-│ 🌍 Host:   production.example.com       │
+│ 💻 Server: web-server                   │
+│ 🌐 Host:   production.example.com       │
 │ 👤 User:   admin                        │
 │ 🔌 Port:   22                           │
-│ 🔑 Key:    ~/.ssh/production_key        │
 └─────────────────────────────────────────┘
 Command: ssh web-server
 
@@ -501,10 +501,10 @@ stat -c %a ~/.ssh/config  # Should be 600
 
 ```bash
 # Reset to normal mode
-Press: ESC ESC ESC
+Press: ESC ESC ESC or q
 
 # Force quit editor
-Type: :q!
+Type: :q! or press q in normal mode
 
 # Check terminal compatibility
 echo $TERM
