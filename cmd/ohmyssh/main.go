@@ -187,7 +187,7 @@ func (m model) handleVimKeybindings(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		
 		// Handle single character commands
 		switch key {
-		case "esc":
+		case "esc", "q":
 			// Exit editor and return to main view
 			m.currentMode = modeNormal
 			m.textarea.Blur()
@@ -399,7 +399,7 @@ func (m model) renderEditor() string {
 	var helpText string
 	switch m.vimMode {
 	case vimNormal:
-		helpText = "i: insert | o: new line | dd: delete line | ZZ: save+quit | :: command | hjkl: move | ESC: exit"
+		helpText = "i: insert | o: new line | dd: delete line | ZZ: save+quit | :: command | hjkl: move | ESC/q: exit"
 	case vimInsert:
 		helpText = "ESC: normal mode | Type to edit"
 	case vimCommand:
@@ -424,9 +424,14 @@ func (m model) renderNormalMode() string {
 		return errorStyle.Render(fmt.Sprintf("Error loading SSH config: %v", m.err))
 	}
 
-	// Calculate panel dimensions (30/70 split)
+	// Calculate panel dimensions (30/70 split) 
 	leftWidth := int(float64(m.width) * 0.3)
 	rightWidth := m.width - leftWidth
+	
+	// Ensure right panel has enough width for borders (add a small buffer)
+	if rightWidth < 10 {
+		rightWidth = 10
+	}
 	topHeight := (m.height - 2) / 2  // Subtract 2 for status bar
 	bottomHeight := (m.height - 2) - topHeight
 
@@ -452,17 +457,33 @@ func (m model) renderNormalMode() string {
 }
 
 func (m model) renderServerList(width, height int) string {
-	style := lipgloss.NewStyle().
+	// Create title outside the main content area
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("62")).  // Blue color matching border
+		Underline(true).
+		Width(width-2).  // Account for border
+		Align(lipgloss.Center)
+	
+	title := titleStyle.Render("🌐 SSH SERVERS 🚀")
+	
+	// Calculate content area height (reserve space for title)
+	contentHeight := height - 3  // Reserve 3 lines for title + border
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	
+	// Content area style
+	contentStyle := lipgloss.NewStyle().
 		Width(width).
-		Height(height).
+		Height(contentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
 		Padding(1)
-
-	title := lipgloss.NewStyle().Bold(true).Render("SSH Servers")
 	
 	if len(m.hosts) == 0 {
-		return style.Render(title + "\n\nNo servers found in SSH config")
+		content := contentStyle.Render("No servers found in SSH config")
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	var serverItems []string
@@ -474,29 +495,57 @@ func (m model) renderServerList(width, height int) string {
 				Foreground(lipgloss.Color("15")).  // Bright white text
 				Background(lipgloss.Color("62")).  // Blue background
 				Padding(0, 1)
-			serverItems = append(serverItems, selectedStyle.Render("▶ "+host.Name))
+			serverItems = append(serverItems, selectedStyle.Render("💻 "+host.Name))
 		} else {
-			// Unselected servers
-			serverItems = append(serverItems, "  "+host.Name)
+			// Unselected servers  
+			serverItems = append(serverItems, "🌐 "+host.Name)
 		}
 	}
 
-	content := title + "\n\n" + strings.Join(serverItems, "\n")
-	return style.Render(content)
+	// Calculate available space for server items (height - borders - padding)
+	availableLines := contentHeight - 2  // 2 for borders+padding
+	if availableLines < 1 {
+		availableLines = 1
+	}
+	
+	// Truncate server list if it's too long
+	if len(serverItems) > availableLines {
+		serverItems = serverItems[:availableLines-1]
+		serverItems = append(serverItems, "... (more servers)")
+	}
+	
+	content := contentStyle.Render(strings.Join(serverItems, "\n"))
+	return lipgloss.JoinVertical(lipgloss.Left, title, content)
 }
 
 func (m model) renderServerMetadata(width, height int) string {
-	style := lipgloss.NewStyle().
+	// Create title outside the main content area
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("105")). // Purple color matching border
+		Underline(true).
+		Width(width-2).  // Account for border
+		Align(lipgloss.Center)
+	
+	title := titleStyle.Render("📋 SERVER DETAILS 🔍")
+	
+	// Calculate content area height (reserve space for title)
+	contentHeight := height - 3  // Reserve 3 lines for title + border
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	
+	// Content area style
+	contentStyle := lipgloss.NewStyle().
 		Width(width).
-		Height(height).
+		Height(contentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("105")).
 		Padding(1)
-
-	title := lipgloss.NewStyle().Bold(true).Render("Server Details")
 	
 	if len(m.hosts) == 0 || m.selectedIdx >= len(m.hosts) {
-		return style.Render(title + "\n\nNo server selected")
+		content := contentStyle.Render("No server selected")
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	selected := m.hosts[m.selectedIdx]
@@ -520,28 +569,65 @@ func (m model) renderServerMetadata(width, height int) string {
 		details = append(details, fmt.Sprintf("%s: %s", strings.Title(key), value))
 	}
 
-	content := title + "\n\n" + strings.Join(details, "\n")
-	return style.Render(content)
+	// Calculate available space for details (height - borders - padding)
+	availableLines := contentHeight - 2  // 2 for borders+padding
+	if availableLines < 1 {
+		availableLines = 1
+	}
+	
+	// Truncate details if too long
+	if len(details) > availableLines {
+		details = details[:availableLines-1]
+		details = append(details, "... (more details)")
+	}
+	
+	content := contentStyle.Render(strings.Join(details, "\n"))
+	return lipgloss.JoinVertical(lipgloss.Left, title, content)
 }
 
 func (m model) renderConfigPreview(width, height int) string {
-	style := lipgloss.NewStyle().
-		Width(width).
-		Height(height).
+	// Create title outside the main content area
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("214")). // Orange color matching border
+		Underline(true).
+		Width(width-2).  // Account for border
+		Align(lipgloss.Center)
+	
+	title := titleStyle.Render("📄 SSH CONFIG PREVIEW ⚙️")
+	
+	// Calculate content area height (reserve space for title)
+	contentHeight := height - 3  // Reserve 3 lines for title + border
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+	
+	// Content area style - reduce width slightly to ensure right border renders
+	contentStyle := lipgloss.NewStyle().
+		Width(width-1).
+		Height(contentHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("214")).
 		Padding(1)
-
-	title := lipgloss.NewStyle().Bold(true).Render("SSH Config Preview")
 	
 	// Use highlighted content that shows the selected server
 	highlightedContent := m.highlightSelectedServerInConfig()
-	content := title + "\n\n" + highlightedContent
 	
-	// Note: We don't truncate highlighted content as it contains escape sequences
-	// that would break the highlighting if cut off
+	// Calculate available space and truncate if necessary
+	availableLines := contentHeight - 2  // 2 for borders+padding
+	if availableLines < 1 {
+		availableLines = 1
+	}
 	
-	return style.Render(content)
+	lines := strings.Split(highlightedContent, "\n")
+	if len(lines) > availableLines {
+		lines = lines[:availableLines-1]
+		lines = append(lines, "... (content truncated)")
+		highlightedContent = strings.Join(lines, "\n")
+	}
+	
+	content := contentStyle.Render(highlightedContent)
+	return lipgloss.JoinVertical(lipgloss.Left, title, content)
 }
 
 func (m model) renderStatusBar() string {
@@ -745,15 +831,15 @@ func connectToServer(host parser.Host) {
 	fmt.Printf("\n")
 	fmt.Printf("🚀 Connecting to server via OhMySSH...\n")
 	fmt.Printf("┌─────────────────────────────────────────┐\n")
-	fmt.Printf("│ Server: %-31s │\n", host.Name)
+	fmt.Printf("│ 💻 Server: %-29s │\n", host.Name)
 	if host.Hostname != "" {
-		fmt.Printf("│ Host:   %-31s │\n", host.Hostname)
+		fmt.Printf("│ 🌐 Host:   %-29s │\n", host.Hostname)
 	}
 	if host.User != "" {
-		fmt.Printf("│ User:   %-31s │\n", host.User)
+		fmt.Printf("│ 👤 User:   %-29s │\n", host.User)
 	}
 	if host.Port != "" {
-		fmt.Printf("│ Port:   %-31s │\n", host.Port)
+		fmt.Printf("│ 🔌 Port:   %-29s │\n", host.Port)
 	}
 	fmt.Printf("└─────────────────────────────────────────┘\n")
 	fmt.Printf("Command: ssh %s\n", host.Name)
